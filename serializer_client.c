@@ -6,6 +6,8 @@
 #include <arpa/inet.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <ctype.h>
+#include "datasizes.h"
 
 #define BUFFER_SIZE 1024
 
@@ -90,7 +92,7 @@ int getDataAndSize(const char *path, char **data, char **size) {
     }
 
     // Convert fileSize to a string
-    char *fileSizeString = (char *)malloc(20);  // Assuming a reasonable limit for the size string
+    char *fileSizeString = (char *)malloc(FILE_SIZE_MAX_LEN + 1);  // Assuming a reasonable limit for the size string
     if (fileSizeString == NULL) {
         perror("Error allocating memory for size");
         free(buffer);
@@ -108,4 +110,93 @@ int getDataAndSize(const char *path, char **data, char **size) {
     fclose(file);
 
     return 0;
+}
+
+// util function
+
+int isMadeUpOfDigits(const char* str) {
+    while (*str != '\0') {
+        if (!isdigit(*str)) {
+            return 0;  // Not made up of digits
+        }
+        str++;
+    }
+    return 1;  // Made up of digits
+}
+
+int isAlphanumeric(const char* str) {
+    while (*str != '\0') {
+        if (!isalnum(*str)) {
+            return 0;  // Not made up of digits
+        }
+        str++;
+    }
+    return 1;  // Made up of digits
+}
+
+// validation functions
+
+int isValidUsername(char* username){
+    return isMadeUpOfDigits(username) && strlen(username) == UID_LEN;
+}
+
+int isValidPassword(char* password){
+    return isAlphanumeric(password) && strlen(password) == USER_PASSWORD_LEN;
+}
+
+int isValidAuctionName(char *auction_name) {
+    return strlen(auction_name) <= AUCTION_NAME_MAX_LEN && isAlphanumeric(auction_name);
+}
+
+int isValidAssetFilename(const char *filename) {
+    // check total length
+    if (strlen(filename) > 24) {
+        return 0; // Invalid
+    }
+
+    // check if it ends with a 3-letter extension
+    size_t len = strlen(filename);
+    if (len < 4 || filename[len - 4] != '.') {
+        return 0; // Invalid
+    }
+
+    // check if extension contains only alphabets
+    for (int i = len - 3; i < len; ++i) {
+        if (!isalpha(filename[i])) {
+            return 0; // Invalid
+        }
+    }
+
+    // check if the rest of the filename contains only alphanumerical, '-', '_', and '.'
+    for (int i = 0; i < len - 4; ++i) {
+        if (!isalnum(filename[i]) && filename[i] != '-' && filename[i] != '_' && filename[i] != '.') {
+            return 0; // Invalid
+        }
+    }
+
+    return 1;
+}
+
+int isValidAuctionStartValue(const char* startvalue){
+    return strlen(startvalue) == AUCTION_START_VALUE_LEN && isMadeUpOfDigits(startvalue);
+}
+
+int isValidAuctionTimeActive(const char* startvalue){
+    return strlen(startvalue) == AUCTION_TIME_ACTIVE_LEN && isMadeUpOfDigits(startvalue);
+}
+
+int isValidAID(const char* AID){
+    return strlen(AID) == AID_MAX_LEN && isMadeUpOfDigits(AID);
+}
+
+int isValidBidValue(const char* bid_value){
+    return strlen(bid_value) <=BID_VALUE_MAX_LEN && isMadeUpOfDigits(bid_value);
+}
+
+int isValidFileSize(char * file_size){
+    if(strlen(file_size)<=FILE_SIZE_MAX_LEN && isMadeUpOfDigits(file_size)){
+        return atoi(file_size);
+    }else{
+        return 0;
+    }
 }

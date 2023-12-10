@@ -8,16 +8,13 @@
 #include <sys/types.h>
 #include "serializer_client.h"
 #include "utils.h"
-#define BUFFER_SIZE 1024
-#define IP_LENGTH 39
-#define STDARD_SERVER_IP "127.0.0.1"
-#define STDARD_SERVER_PORT 58000 + 3
+#include "datasizes.h"
 
 #define CONTINUE_COMMAND 1
-#define EXIT_COMMAND 1
+#define EXIT_COMMAND 0
 
-char username[UID_MAX_LEN] = "";
-char password[PASSWORD_MAX_LEN] = "";
+char username[UID_LEN + 1] = "";
+char password[USER_PASSWORD_LEN + 1] = "";
 
 char server_ip[IP_LENGTH];
 int server_port;
@@ -138,7 +135,6 @@ char* udp_connection(const char *message) {
 
     // Send the message to the server
     sendto(sockfd, message, strlen(message), 0, (struct sockaddr *)&serverAddr, sizeof(serverAddr));
-
     // Receive the response from the server
     char *buffer = (char*)malloc(BUFFER_SIZE * sizeof(char));  // Allocate memory dynamically
     if (buffer == NULL) {
@@ -158,7 +154,6 @@ char* udp_connection(const char *message) {
 
     // Null-terminate the received data
     buffer[bytesRead] = '\0';
-    
     // Close the socket
     close(sockfd);
 
@@ -175,9 +170,18 @@ int isLoggedIn(){
 // handle each user command (send request, receive response, print status description)
 
 int handleLogin(char* _username, char* _password) {
-    char request[256];
-    sprintf(request, "LIN %s %s", _username, _password);
+    if(!isValidUsername(_username)){
+        fprintf(stderr, "Entered username isn't valid.\n");
+        return 0;
+    }
 
+    if(!isValidPassword(_password)){
+        fprintf(stderr, "Entered password isn't valid.\n");
+        return 0;
+    }
+
+    char request[3 + 1 + UID_LEN + 1 + USER_PASSWORD_LEN + 1 + 1];
+    sprintf(request, "LIN %s %s\n", _username, _password);
     char* response = udp_connection(request);
 
     char** words_response;
@@ -192,6 +196,9 @@ int handleLogin(char* _username, char* _password) {
         } else if (!strcmp(words_response[1], "NOK")) {
             printf("Incorrect login.\n");
             return 0;
+        } else if (!strcmp(words_response[1], "ALR")) {
+            printf("Someone's already logged-in in that account.\n");
+            return 0;
         } else if (!strcmp(words_response[1], "REG")) {
             printf("New user registered.\n");
             return 1;
@@ -204,8 +211,8 @@ int handleLogin(char* _username, char* _password) {
 }
 
 int handleLogout(){
-    char request[256];
-    sprintf(request, "LOU %s %s", username, password);
+    char request[3 + 1 + UID_LEN + 1+ USER_PASSWORD_LEN + 1 + 1];
+    sprintf(request, "LOU %s %s\n", username, password);
 
     char* response = udp_connection(request);
 
@@ -233,8 +240,8 @@ int handleLogout(){
 }
 
 int handleUnregister(){
-    char request[256];
-    sprintf(request, "UNR %s %s", username, password);
+    char request[3 + 1 + UID_LEN + 1+ USER_PASSWORD_LEN + 1 + 1];
+    sprintf(request, "UNR %s %s\n", username, password);
 
     char* response = udp_connection(request);
 
@@ -265,12 +272,32 @@ int handleExit(){
     if(!strcmp(username, "") && !strcmp(password, "")){ // if loggedout
         return 1;
     } else{
-        printf("Please execute the logout command before exiting the application.");
+        printf("Please execute the logout command before exiting the application.\n");
         return 0;
     }
 }
 
 void handleOpen(char* name, char* asset_fname, char* start_value, char* timeactive){
+    if(!isValidAuctionName(name)){
+        fprintf(stderr, "Entered auction name isn't valid.\n");
+        return;
+    }
+
+    if(!isValidAssetFilename(asset_fname)){
+        fprintf(stderr, "Entered asset file name isn't valid.\n");
+        return;
+    }
+
+    if(!isValidAuctionStartValue(start_value)){
+        fprintf(stderr, "Entered auction start value isn't valid.\n");
+        return;
+    }
+
+    if(!isValidAuctionTimeActive(timeactive)){
+        fprintf(stderr, "Entered auction time active isn't valid.\n");
+        return;
+    }
+
     char* asset_data;
     char* asset_size;
     
@@ -279,8 +306,16 @@ void handleOpen(char* name, char* asset_fname, char* start_value, char* timeacti
         return;
     }
     
-    char request[256];
-    sprintf(request, "OPA %s %s %s %s %s %s %s %s",
+    int asset_size_int;
+    char *request;
+    if(asset_size_int = isValidFileSize(asset_size)){
+        request = (char *)malloc(3 + 1 + UID_LEN + 1 + USER_PASSWORD_LEN + 1 + AUCTION_NAME_MAX_LEN + 1 + AUCTION_START_VALUE_LEN + 1 + AUCTION_TIME_ACTIVE_LEN + 1 + ASSET_FILENAME_MAX_LEN + 1 + ASSET_SIZE_MAX_LEN + 1 + asset_size_int + 1 + 1);
+
+    } else{
+        printf("The asset file can't be bigger than 10MB.\n");
+        return;
+    }
+    sprintf(request, "OPA %s %s %s %s %s %s %s %s\n",
     username, password, name, start_value, timeactive, asset_fname, asset_size, asset_data);
 
     char* response = tcp_connection(request);
@@ -302,8 +337,14 @@ void handleOpen(char* name, char* asset_fname, char* start_value, char* timeacti
 }
 
 void handleClose(char* AID){
-    char request[256];
-    sprintf(request, "UNR %s %s %s", username, password, AID);
+    if(!isValidAID(AID)){
+        fprintf(stderr, "Entered AID isn't valid.\n");
+        return;
+    }
+
+
+    char request[3 + 1 + UID_LEN + 1 + USER_PASSWORD_LEN + 1 + AID_MAX_LEN + 1 + 1];
+    sprintf(request, "CLS %s %s %s\n", username, password, AID);
 
     char* response = tcp_connection(request);
 
@@ -321,6 +362,9 @@ void handleClose(char* AID){
         } else if (!strcmp(words_response[1], "END")) {
             printf("Auction %s was already closed.\n", AID);
             return;
+        } else if (!strcmp(words_response[1], "EOW")) {
+            printf("Auction %s isn't yours to close.\n", AID);
+            return;
         } else {
             fprintf(stderr, "Server's response is invalid.\n");
         }
@@ -331,8 +375,8 @@ void handleClose(char* AID){
 }
 
 void handleMyBids(){
-    char request[256];
-    sprintf(request, "LMB %s", username);
+    char request[3 + 1 + UID_LEN + 1 + 1];
+    sprintf(request, "LMB %s\n", username);
 
     char* response = udp_connection(request);
 
@@ -344,10 +388,10 @@ void handleMyBids(){
         if (numWords_response == 2 && !strcmp(words_response[1], "NOK")) {
             printf("You have no ongoing bids.\n");
             return;
-        }else if ((numWords_response % 2 == 0) && !strcmp(words_response[1], "OK")) {
+        }else if (!strcmp(words_response[1], "OK")) {
             printf("List of auctions you've bidded on:\n");
-            for(int i = 0; i<numWords_response - 2;i++){
-                printf("AID: %s ; State: %s \n", words_response[i], words_response[++i]);
+            for(int i = 2; i<numWords_response-1;i+=2){
+                printf("AID: %s ; State: %s \n", words_response[i], words_response[i+1]);
             }
             return;
         } else {
@@ -360,23 +404,23 @@ void handleMyBids(){
 }
 
 void handleMyAuctions(){
-    char request[256];
-    sprintf(request, "LMA %s", username);
+    char request[3 + 1 + UID_LEN + 1+1];
+    sprintf(request, "LMA %s\n", username);
 
     char* response = udp_connection(request);
 
     char** words_response;
     int numWords_response;
     getWords(response, &words_response, &numWords_response);
-    if (!strcmp(words_response[0], "RMB")) {
+    if (!strcmp(words_response[0], "RMA")) {
         // Process response
         if (numWords_response == 2 && !strcmp(words_response[1], "NOK")) {
-            printf("You have no ongoing bids.\n");
+            printf("You have no ongoing auctions.\n");
             return;
-        }else if ((numWords_response % 2 == 0) && !strcmp(words_response[1], "OK")) {
+        }else if (!strcmp(words_response[1], "OK")) {
             printf("List of auctions you created:\n");
-            for(int i = 0; i<numWords_response - 2;i++){
-                printf("AID: %s ; State: %s \n", words_response[i], words_response[++i]);
+            for(int i = 2; i<numWords_response-1;i+=2){
+                printf("AID: %s ; State: %s \n", words_response[i], words_response[i+1]);
             }
             return;
         } else {
@@ -389,8 +433,8 @@ void handleMyAuctions(){
 }
 
 void handleList(){
-    char request[256];
-    sprintf(request, "LST");
+    char request[3+1+1];
+    sprintf(request, "LST\n");
     char* response = udp_connection(request);
 
     char** words_response;
@@ -403,7 +447,7 @@ void handleList(){
             return;
         }else if ((numWords_response % 2 == 0) && !strcmp(words_response[1], "OK")) {
             printf("List of all auctions:\n");
-            for(int i = 0; i<numWords_response - 2;i++){
+            for(int i = 2; i<numWords_response-1;i+=2){
                 printf("AID: %s ; State: %s \n", words_response[i], words_response[++i]);
             }
             return;
@@ -414,37 +458,59 @@ void handleList(){
         fprintf(stderr, "Server's response is invalid.\n");
     }
 }
-//FIXME
-// void handleShowRecord(char* AID){
-//     char request[256];
-//     sprintf(request, "LST %s", AID);
-//     char* response = udp_connection(request);
 
-//     char** words_response;
-//     int numWords_response;
-//     getWords(response, &words_response, &numWords_response);
-//     if (!strcmp(words_response[0], "RRC")) {
-//         // Process response
-//         if (numWords_response == 2 && !strcmp(words_response[1], "NOK")) {
-//             printf("Auction %s doesn't exist.\n", AID);
-//             return 1;
-//         }else if ((numWords_response % 2 == 0) && !strcmp(words_response[1], "OK")) {
-//             printf("List of all auctions:\n");
-//             for(int i = 0; i<numWords_response - 2;i++){
-//                 printf("AID: %s ; State: %s \n", words_response[i], words_response[++i]);
-//             }
-//             return 0;
-//         } else {
-//             fprintf(stderr, "Server's response is invalid.\n");
-//         }
-//     } else {
-//         fprintf(stderr, "Server's response is invalid.\n");
-//     }
-// }
+void handleShowRecord(char* AID){
+    char request[3 + 1 + AID_MAX_LEN + 2];
+    sprintf(request, "SRC %s", AID);
+    char* response = udp_connection(request);
+
+    char** words_response;
+    int numWords_response;
+    getWords(response, &words_response, &numWords_response);
+    if (!strcmp(words_response[0], "RRC")) {
+        // Process response
+        if (numWords_response == 2 && !strcmp(words_response[1], "NOK")) {
+            printf("Auction %s doesn't exist.\n", AID);
+        }else if (!strcmp(words_response[1], "OK" )) {
+            int index = 1;
+            while(index < numWords_response){
+                if(!strcmp(words_response[index],"B")){
+                    index++;
+                    printf("Bid:\n  bidder_UID:%s\n  bid_value:%s\n  bid_date-time:%s %s\n  bid_sec_time:%s\n",
+                    words_response[index],words_response[index+1],
+                    words_response[index+2],words_response[index+3],words_response[index+4]);
+                    index+=4;
+                } else if(!strcmp(words_response[index],"E")){
+                    index++;
+                    printf("This auction ended at %s %s - it lasted %s seconds.\n",
+                    words_response[index],words_response[index+1],words_response[index+2]);
+                    index+=2;
+                    break; //"end" should be the last part of the response, if not the server is not following the standards
+                } else{
+                    index++;
+                    printf("host_UID:%s\n  auction_name:%s\n  asset_fname:%s\n  start_value:%s\n  start_data-time:%s %s\n  timeactive:%s\n",
+                    words_response[index],words_response[index+1],words_response[index+2],words_response[index+3],
+                    words_response[index+4],words_response[index+5],words_response[index+6]);
+                    index+=6;
+                }
+                index++;
+            }
+        } else {
+            fprintf(stderr, "Server's response is invalid.\n");
+        }
+    } else {
+        fprintf(stderr, "Server's response is invalid.\n");
+    }
+}
 
 void handleShowAsset(char* AID){
-    char request[256];
-    sprintf(request, "SAS %s", AID);
+    if(!isValidAID(AID)){
+        fprintf(stderr, "Entered AID isn't valid.\n");
+        return;
+    }
+
+    char request[3+1+AID_MAX_LEN+1+1];
+    sprintf(request, "SAS %s\n", AID);
     char* response = tcp_connection(request);
 
     char** words_response;
@@ -456,7 +522,7 @@ void handleShowAsset(char* AID){
             printf("There is not file to be shown, or there was another type of problem.\n");
         }else if ((numWords_response == 5) && !strcmp(words_response[1], "OK")) {
             printf("Asset related to the auction %s:\n", AID);
-            printf("File name: %s \n; File size: %s \n; File data: %s\n", words_response[2], words_response[3], words_response[4]);
+            printf("File name: %s; \nFile size: %s; \nFile data:\n %s\n", words_response[2], words_response[3], words_response[4]);
         } else {
             fprintf(stderr, "Server's response is invalid.\n");
         }
@@ -466,8 +532,18 @@ void handleShowAsset(char* AID){
 }
 
 void handleBid(char* AID, char* value){
-    char request[256];
-    sprintf(request, "BID %s %s %s %s", username, password, AID, value);
+    if(!isValidAID(AID)){
+        fprintf(stderr, "Entered AID isn't valid.\n");
+        return;
+    }
+    
+    if(!isValidBidValue(value)){
+        fprintf(stderr, "Entered bid value isn't valid.\n");
+        return;
+    }
+
+    char request[3 + 1 + UID_LEN + 1 + USER_PASSWORD_LEN + 1 +AID_MAX_LEN+1+BID_VALUE_MAX_LEN+1+ 1];
+    sprintf(request, "BID %s %s %s %s\n", username, password, AID, value);
     char* response = tcp_connection(request);
 
     char** words_response;
@@ -485,6 +561,8 @@ void handleBid(char* AID, char* value){
             printf("Your bid was smaller then the current biggest bid on auction %s.\n", AID);
         }else if (!strcmp(words_response[1], "ILG")) {
             printf("You can't bid in your own auction.\n");
+        }else if (!strcmp(words_response[1], "CLO")) {
+            printf("You can't bid, because the auction is already closed.\n");
         }else {
             fprintf(stderr, "Server's response is invalid.\n");
         }
@@ -503,10 +581,9 @@ int handleUserCommand(char* command) {
     char* request = malloc(256*sizeof(char));
     request[0] = '\0';
     char* response = malloc(256*sizeof(char));
-
+    printf("\n");
     if(isLoggedIn() && numWords==1){
         if(!strcmp(words[0],"logout")){
-            
             if(handleLogout()==1){
                 strcpy(username, "");
                 strcpy(password, "");
@@ -524,16 +601,12 @@ int handleUserCommand(char* command) {
             handleMyBids();
         } else if(!strcmp(words[0],"list") || !strcmp(words[0],"l")){
             handleList();
-        } else if(!strcmp(words[0],"exit")){
-            if(handleExit()==1){
-                return EXIT_COMMAND;
-            }
-        } else{
-            fprintf(stderr, "You've entered an invalid command.\n" );
+        } else if(strcmp(words[0],"exit")){
+            printf("You need to logout before exiting the program.\n" );
         }
     } else if(isLoggedIn() && numWords == 2){
         if(!strcmp(words[0],"show_record") || !strcmp(words[0],"sr")){
-
+            handleShowRecord(words[1]);
         } else if(!strcmp(words[0],"close")){
             handleClose(words[1]);
         } else if(!strcmp(words[0],"show_asset") || !strcmp(words[0],"sa")){
@@ -556,10 +629,15 @@ int handleUserCommand(char* command) {
     } else if(isLoggedIn() && numWords == 5 && !strcmp(words[0], "open")){
         handleOpen(words[1], words[2], words[3], words[4]);
 
+    } else if(!strcmp(words[0],"exit") && numWords == 1){
+        if(handleExit()==1){
+            return EXIT_COMMAND;
+        }
     } else{
 
         fprintf(stderr, "You've entered an invalid command.\n" );
     }
+    printf("\n");
 
     // Free the allocated memory
     freeWords(words, numWords);
@@ -569,7 +647,6 @@ int handleUserCommand(char* command) {
 
 int main(int argc, char *argv[]) {
     set_args(argc,argv); //set initial parameters
-
     // Get input from the user and send to the server
     char buffer[BUFFER_SIZE];
     while (1) {

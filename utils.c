@@ -7,6 +7,9 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <time.h>
+#include "datasizes.h"
+
+#define MAX_CLIENT_PATH_LEN 256
 
 
 char* intToString(int num) {
@@ -26,13 +29,10 @@ char* intToString(int num) {
     return str;
 }
 
-
-
-
 // "Clients/102890"
 char* pathClientFolder(char* UID) {
     // Allocate memory for the path
-    char *path = (char *)malloc(MAX_CLIENT_PATH_LEN);
+    char *path = (char *)malloc(7 + 1 + UID_LEN + 1);
 
     if (path == NULL) {
         // Handle memory allocation failure
@@ -50,7 +50,7 @@ char* pathClientFolder(char* UID) {
 // "Clients/102890/main.txt"
 char* pathClientMain(char* UID) {
     // Allocate memory for the path
-    char *path = (char *)malloc(MAX_CLIENT_PATH_LEN);
+    char *path = (char *)malloc(7 + 1 + UID_LEN + 1 + 8 + 1);
 
     if (path == NULL) {
         // Handle memory allocation failure
@@ -69,7 +69,7 @@ char* pathClientMain(char* UID) {
 // "Clients/102890/bidder.txt"
 char* pathClientBidder(char* UID) {
     // Allocate memory for the path
-    char *path = (char *)malloc(MAX_CLIENT_PATH_LEN);
+    char *path = (char *)malloc(7 + 1 + UID_LEN + 1 + 10 + 1);
 
     if (path == NULL) {
         // Handle memory allocation failure
@@ -88,7 +88,7 @@ char* pathClientBidder(char* UID) {
 // "Clients/102890/host.txt"
 char* pathClientHost(char* UID) {
     // Allocate memory for the path
-    char *path = (char *)malloc(MAX_CLIENT_PATH_LEN);
+    char *path = (char *)malloc(7 + 1 + UID_LEN + 1 + 8 + 1);
 
     if (path == NULL) {
         // Handle memory allocation failure
@@ -110,9 +110,9 @@ char* pathClientHost(char* UID) {
 
 
 // "Auctions/auction1"
-char* pathAuctionFolder(char* auction_name) {
+char* pathAuctionFolder(char* AID) {
     // Allocate memory for the path
-    char *path = (char *)malloc(MAX_CLIENT_PATH_LEN);
+    char *path = (char *)malloc(8 + 1 + AID_MAX_LEN + 1);
 
     if (path == NULL) {
         // Handle memory allocation failure
@@ -122,15 +122,15 @@ char* pathAuctionFolder(char* auction_name) {
 
     // Construct the path using intToString
     strcpy(path, "Auctions/");
-    strcat(path, auction_name);
+    strcat(path, AID);
 
     return path;
 }
 
 // "Auctions/auction1/main.txt"
-char* pathAuctionMain(char* auction_name) {
+char* pathAuctionMain(char* AID) {
     // Allocate memory for the path
-    char *path = (char *)malloc(MAX_CLIENT_PATH_LEN);
+    char *path = (char *)malloc(8 + 1 + AID_MAX_LEN + 1 + 8 + 1);
 
     if (path == NULL) {
         // Handle memory allocation failure
@@ -140,16 +140,16 @@ char* pathAuctionMain(char* auction_name) {
 
     // Construct the path using intToString
     strcpy(path, "Auctions/");
-    strcat(path, auction_name);
+    strcat(path, AID);
     strcat(path, "/main.txt");
 
     return path;
 }
 
 // "Auctions/auction1/bids.txt"
-char* pathAuctionBids(char* auction_name) {
+char* pathAuctionBids(char* AID) {
     // Allocate memory for the path
-    char *path = (char *)malloc(MAX_CLIENT_PATH_LEN);
+    char *path = (char *)malloc(8 + 1 + AID_MAX_LEN + 1 + 10 + 1);
 
     if (path == NULL) {
         // Handle memory allocation failure
@@ -159,16 +159,16 @@ char* pathAuctionBids(char* auction_name) {
 
     // Construct the path using intToString
     strcpy(path, "Auctions/");
-    strcat(path, auction_name);
+    strcat(path, AID);
     strcat(path, "/bidder.txt");
 
     return path;
 }
 
 // "Auctions/auction1/end.txt"
-char* pathAuctionEnd(char* auction_name) {
+char* pathAuctionEnd(char* AID) {
     // Allocate memory for the path
-    char *path = (char *)malloc(MAX_CLIENT_PATH_LEN);
+    char *path = (char *)malloc(8 + 1 + AID_MAX_LEN + 1 + 7 + 1);
 
     if (path == NULL) {
         // Handle memory allocation failure
@@ -178,7 +178,7 @@ char* pathAuctionEnd(char* auction_name) {
 
     // Construct the path using intToString
     strcpy(path, "Auctions/");
-    strcat(path, auction_name);
+    strcat(path, AID);
     strcat(path, "/end.txt");
 
     return path;
@@ -188,7 +188,7 @@ char* pathAuctionEnd(char* auction_name) {
 // "Assets/asset1.txt"
 char* pathAsset(char*asset_fname){
     // Allocate memory for the path
-    char *path = (char *)malloc(MAX_CLIENT_PATH_LEN);
+    char *path = (char *)malloc(6 + 1 + ASSET_FILENAME_MAX_LEN + 4 + 1);
 
     if (path == NULL) {
         // Handle memory allocation failure
@@ -217,14 +217,14 @@ char* getCurrentDateTime() {
     timeinfo = localtime(&rawtime);
 
     // Format the time into a string
-    char* datetime = (char*)malloc((DATETIME_MAX_LEN + 1) * sizeof(char)); // +1 for the null terminator
+    char* datetime = (char*)malloc((DATE_TIME_FORMAT_LEN + 1) * sizeof(char)); // +1 for the null terminator
 
     if (datetime == NULL) {
         perror("Error allocating memory");
         exit(EXIT_FAILURE);
     }
 
-    strftime(datetime, DATETIME_MAX_LEN + 1, "%Y-%m-%d %H:%M:%S", timeinfo);
+    strftime(datetime, DATE_TIME_FORMAT_LEN + 1, "%Y-%m-%d %H:%M:%S", timeinfo);
 
     return datetime;
 }
@@ -264,7 +264,7 @@ char* computeTimeDifference(char* datetime1, char* datetime2) {
     long diff_seconds = labs((long)(time2 - time1));
 
     // Convert the result to string
-    char* result = (char*)malloc(20);  // Adjust the size as needed
+    char* result = (char*)malloc(DATE_TIME_FORMAT_LEN + 1);  // Adjust the size as needed
     if (result != NULL) {
         snprintf(result, 20, "%ld", diff_seconds);
         return result;
@@ -276,15 +276,15 @@ char* computeTimeDifference(char* datetime1, char* datetime2) {
 
 // getters for Auctions
 
-char* getAuctionHostUID(char* auction_name) {
-    FILE* file = fopen(pathAuctionMain(auction_name), "r");
+char* getAuctionHostUID(char* AID) {
+    FILE* file = fopen(pathAuctionMain(AID), "r");
     if (file != NULL) {
         // Allocate memory for the buffer to store the content of the first line
-        char* buffer = (char*)malloc(256); // Adjust the size as needed
+        char* buffer = (char*)malloc(UID_LEN + 1); // Adjust the size as needed
 
         if (buffer != NULL) {
             // Read the first line into the buffer
-            if (fgets(buffer, 256, file) != NULL) {
+            if (fgets(buffer, UID_LEN + 1, file) != NULL) {
                 // Remove the newline character if present
                 char* newline = strchr(buffer, '\n');
                 if (newline != NULL) {
@@ -316,17 +316,18 @@ char* getAuctionHostUID(char* auction_name) {
     return NULL;
 }
 
-char* getAuctionAssetFName(char* auction_name) {
-    FILE* file = fopen(pathAuctionMain(auction_name), "r");
+char* getAuctionAssetFName(char* AID) {
+    FILE* file = fopen(pathAuctionMain(AID), "r");
     if (file != NULL) {
         // Allocate memory for the buffer to store the content of the second line
-        char* buffer = (char*)malloc(256); // Adjust the size as needed
+        char* buffer = (char*)malloc(ASSET_FILENAME_MAX_LEN + 1); // Adjust the size as needed
+        char* dummy = (char*)malloc(256);
 
         if (buffer != NULL) {
             // Skip the first line
-            if (fgets(buffer, 256, file) != NULL) {
+            if (fgets(dummy, 256, file) != NULL) {
                 // Read the second line into the buffer
-                if (fgets(buffer, 256, file) != NULL) {
+                if (fgets(buffer, ASSET_FILENAME_MAX_LEN + 1, file) != NULL) {
                     // Remove the newline character if present
                     char* newline = strchr(buffer, '\n');
                     if (newline != NULL) {
@@ -361,16 +362,17 @@ char* getAuctionAssetFName(char* auction_name) {
     return NULL;
 }
 
-char* getAuctionStartValue(char* auction_name) {
-    FILE* file = fopen(pathAuctionMain(auction_name), "r");
+char* getAuctionStartValue(char* AID) {
+    FILE* file = fopen(pathAuctionMain(AID), "r");
 
     if (file != NULL) {
         // Allocate memory for the buffer to store the content of the third line
-        char* buffer = (char*)malloc(256); // Adjust the size as needed
+        char* buffer = (char*)malloc(AUCTION_START_VALUE_LEN + 1); // Adjust the size as needed
+        char* dummy = (char*)malloc(256);
 
         // Skip the first two lines
         for (int i = 0; i < 2; ++i) {
-            if (fgets(buffer, 256, file) == NULL) {
+            if (fgets(dummy, 256, file) == NULL) {
                 // Error reading file or not enough lines
                 perror("Error reading file or not enough lines");
                 fclose(file);
@@ -380,7 +382,7 @@ char* getAuctionStartValue(char* auction_name) {
         }
 
         // Read the content of the third line into the buffer
-        if (fgets(buffer, 256, file) != NULL) {
+        if (fgets(buffer, AUCTION_START_VALUE_LEN + 1, file) != NULL) {
             // Remove the newline character if present
             char* newline = strchr(buffer, '\n');
             if (newline != NULL) {
@@ -408,17 +410,18 @@ char* getAuctionStartValue(char* auction_name) {
     return NULL;
 }
 
-char* getAuctionStartDateTime(char* auction_name) {
-    FILE* file = fopen(pathAuctionMain(auction_name), "r");
+char* getAuctionStartDateTime(char* AID) {
+    FILE* file = fopen(pathAuctionMain(AID), "r");
 
     if (file != NULL) {
         // Allocate memory for the buffer to store the content of the fourth line
-        char* buffer = (char*)malloc(256); // Adjust the size as needed
+        char* buffer = (char*)malloc(DATE_TIME_FORMAT_LEN + 1); // Adjust the size as needed
+        char* dummy = (char*)malloc(256);
 
         if (buffer != NULL) {
             // Read the first three lines and discard them
             for (int i = 0; i < 3; ++i) {
-                if (fgets(buffer, 256, file) == NULL) {
+                if (fgets(dummy, 256, file) == NULL) {
                     perror("Error reading file");
                     free(buffer);
                     fclose(file);
@@ -427,7 +430,7 @@ char* getAuctionStartDateTime(char* auction_name) {
             }
 
             // Read the fourth line into the buffer
-            if (fgets(buffer, 256, file) != NULL) {
+            if (fgets(buffer, DATE_TIME_FORMAT_LEN + 1, file) != NULL) {
                 // Remove the newline character if present
                 char* newline = strchr(buffer, '\n');
                 if (newline != NULL) {
@@ -459,16 +462,17 @@ char* getAuctionStartDateTime(char* auction_name) {
     return NULL;
 }
 
-char* getAuctionTimeactive(char* auction_name) {
-    FILE* file = fopen(pathAuctionMain(auction_name), "r");
+char* getAuctionTimeactive(char* AID) {
+    FILE* file = fopen(pathAuctionMain(AID), "r");
 
     if (file != NULL) {
         // Allocate memory for the buffer to store the content of the fifth line
-        char* buffer = (char*)malloc(256); // Adjust the size as needed
+        char* buffer = (char*)malloc(AUCTION_TIME_ACTIVE_LEN + 1); // Adjust the size as needed
+        char* dummy = (char*)malloc(256);
 
         // Read and discard the first four lines
         for (int i = 0; i < 4; ++i) {
-            if (fgets(buffer, 256, file) == NULL) {
+            if (fgets(dummy, 256, file) == NULL) {
                 perror("Error reading file");
                 fclose(file);
                 free(buffer);
@@ -477,7 +481,7 @@ char* getAuctionTimeactive(char* auction_name) {
         }
 
         // Read the content of the fifth line into the buffer
-        if (fgets(buffer, 256, file) != NULL) {
+        if (fgets(buffer, AUCTION_TIME_ACTIVE_LEN + 1, file) != NULL) {
             // Remove the newline character if present
             char* newline = strchr(buffer, '\n');
             if (newline != NULL) {
@@ -504,15 +508,70 @@ char* getAuctionTimeactive(char* auction_name) {
     return NULL;
 }
 
-char* getAuctionStatus(char* auction_name) {
-    FILE* file = fopen(pathAuctionEnd(auction_name), "r");
+char* getAuctionName(char* AID) {
+    FILE* file = fopen(pathAuctionMain(AID), "r");
+
     if (file != NULL) {
+        // Allocate memory for the buffer to store the content of the sixth line
+        char* buffer = (char*)malloc(AUCTION_NAME_MAX_LEN + 1); // Adjust the size as needed
+        char* dummy = (char*)malloc(256);
+
+        if (buffer != NULL) {
+            // Skip the first five lines
+            for (int i = 0; i < 5; ++i) {
+                if (fgets(dummy, 256, file) == NULL) {
+                    // Error reading file or not enough lines
+                    perror("Error reading file or not enough lines");
+                    fclose(file);
+                    free(buffer);
+                    return NULL;
+                }
+            }
+
+            // Read the content of the sixth line into the buffer
+            if (fgets(buffer, AUCTION_NAME_MAX_LEN + 1, file) != NULL) {
+                // Remove the newline character if present
+                char* newline = strchr(buffer, '\n');
+                if (newline != NULL) {
+                    *newline = '\0';
+                }
+
+                // Close the file
+                fclose(file);
+
+                // Return the content of the sixth line
+                return buffer;
+            } else {
+                perror("Error reading file");
+            }
+
+            // Free the allocated buffer if an error occurred
+            free(buffer);
+        } else {
+            perror("Error allocating memory");
+        }
+
+        // Close the file
+        fclose(file);
+    } else {
+        perror("Error opening file");
+    }
+
+    // Return NULL if an error occurred
+    return NULL;
+}
+
+char* getAuctionStatus(char* AID) {
+    FILE* file = fopen(pathAuctionEnd(AID), "r");
+    if (file != NULL) {
+
         // Allocate memory for the buffer to store the content of the first line
-        char* buffer = (char*)malloc(256); // Adjust the size as needed
+        char* buffer = (char*)malloc(2); // Adjust the size as needed
 
         if (buffer != NULL) {
             // Read the first line into the buffer
-            if (fgets(buffer, 256, file) != NULL) {
+            if (fgets(buffer, 2, file) != NULL) {
+
                 // Remove the newline character if present
                 char* newline = strchr(buffer, '\n');
                 if (newline != NULL) {
@@ -544,17 +603,18 @@ char* getAuctionStatus(char* auction_name) {
     return NULL;
 }
 
-char* getAuctionEndDatetime(char* auction_name)  {
-    FILE* file = fopen(pathAuctionEnd(auction_name), "r");
+char* getAuctionEndDatetime(char* AID)  {
+    FILE* file = fopen(pathAuctionEnd(AID), "r");
     if (file != NULL) {
         // Allocate memory for the buffer to store the content of the second line
-        char* buffer = (char*)malloc(256); // Adjust the size as needed
+        char* buffer = (char*)malloc(DATE_TIME_FORMAT_LEN + 1); // Adjust the size as needed
+        char* dummy = (char*)malloc(256);
 
         if (buffer != NULL) {
             // Skip the first line
-            if (fgets(buffer, 256, file) != NULL) {
+            if (fgets(dummy, 256, file) != NULL) {
                 // Read the second line into the buffer
-                if (fgets(buffer, 256, file) != NULL) {
+                if (fgets(buffer, DATE_TIME_FORMAT_LEN + 1, file) != NULL) {
                     // Remove the newline character if present
                     char* newline = strchr(buffer, '\n');
                     if (newline != NULL) {
@@ -589,17 +649,18 @@ char* getAuctionEndDatetime(char* auction_name)  {
     return NULL;
 }
 
-char* getAuctionRealDuration(char* auction_name) {
-    FILE* file = fopen(pathAuctionEnd(auction_name), "r");
+char* getAuctionRealDuration(char* AID) {
+    FILE* file = fopen(pathAuctionEnd(AID), "r");
     if (file != NULL) {
         // Allocate memory for the buffer to store the content of the third line
-        char* buffer = (char*)malloc(256); // Adjust the size as needed
+        char* buffer = (char*)malloc(AUCTION_START_VALUE_LEN + 1); // Adjust the size as needed
+        char* dummy = (char*)malloc(256);
 
         if (buffer != NULL) {
             // Skip the first two lines
-            if (fgets(buffer, 256, file) != NULL && fgets(buffer, 256, file) != NULL) {
+            if (fgets(dummy, 256, file) != NULL && fgets(dummy, 256, file) != NULL) {
                 // Read the third line into the buffer
-                if (fgets(buffer, 256, file) != NULL) {
+                if (fgets(buffer, AUCTION_START_VALUE_LEN + 1, file) != NULL) {
                     // Remove the newline character if present
                     char* newline = strchr(buffer, '\n');
                     if (newline != NULL) {
@@ -641,11 +702,11 @@ char* getClientPassword(char* UID) {
     FILE* file = fopen(pathClientMain(UID), "r");
     if (file != NULL) {
         // Allocate memory for the buffer to store the content of the first line
-        char* buffer = (char*)malloc(256); // Adjust the size as needed
+        char* buffer = (char*)malloc(USER_PASSWORD_LEN + 1); // Adjust the size as needed
 
         if (buffer != NULL) {
             // Read the first line into the buffer
-            if (fgets(buffer, 256, file) != NULL) {
+            if (fgets(buffer, USER_PASSWORD_LEN + 1, file) != NULL) {
                 // Remove the newline character if present
                 char* newline = strchr(buffer, '\n');
                 if (newline != NULL) {
@@ -679,8 +740,8 @@ char* getClientPassword(char* UID) {
 
 // bid validation
 
-int getLastBidValue(char* auction_name) {
-    FILE* file = fopen(pathAuctionBids(auction_name), "r");
+int getLastBidValue(char* AID) {
+    FILE* file = fopen(pathAuctionBids(AID), "r");
 
     if (file != NULL) {
         // Seek to the end of the file
@@ -690,7 +751,7 @@ int getLastBidValue(char* auction_name) {
         long fileSize = ftell(file);
         if (fileSize == 0) {
             fclose(file);
-            return atoi(getAuctionStartValue(auction_name)) - 1;
+            return atoi(getAuctionStartValue(AID)) - 1;
         }
 
         // Find the position of the penultimate newline character
@@ -716,7 +777,7 @@ int getLastBidValue(char* auction_name) {
         position++;
 
         // Read line
-        char buffer[256];
+        char buffer[BID_VALUE_MAX_LEN + 1];
         if (fgets(buffer, sizeof(buffer), file) != NULL) {
             // Remove the newline character if present
             char* newline = strchr(buffer, '\n');
@@ -732,30 +793,30 @@ int getLastBidValue(char* auction_name) {
         } else {
             // Error reading the line
             fclose(file);
-            return atoi(getAuctionStartValue(auction_name)) - 1;
+            return atoi(getAuctionStartValue(AID)) - 1;
         }
     } else {
         perror("Error opening file");
-        return atoi(getAuctionStartValue(auction_name)) - 1;
+        return atoi(getAuctionStartValue(AID)) - 1;
     }
 }
 
-int validateBid(char* auction_name, char* value){
-    return atoi(value)>getLastBidValue(auction_name);
+int validateBid(char* AID, char* value){
+    return atoi(value)>getLastBidValue(AID);
 }
 
 
 // getters for Assets
 
-char* getAssetData(char* auction_name) {
-    FILE* file = fopen(pathAsset(getAuctionAssetFName(auction_name)), "r");
+char* getAssetSize(char* AID) {
+    FILE* file = fopen(pathAsset(getAuctionAssetFName(AID)), "r");
     if (file != NULL) {
         // Allocate memory for the buffer to store the content of the first line
-        char* buffer = (char*)malloc(256); // Adjust the size as needed
+        char* buffer = (char*)malloc(ASSET_SIZE_MAX_LEN + 1); // Adjust the size as needed
 
         if (buffer != NULL) {
             // Read the first line into the buffer
-            if (fgets(buffer, 256, file) != NULL) {
+            if (fgets(buffer, ASSET_SIZE_MAX_LEN + 1, file) != NULL) {
                 // Remove the newline character if present
                 char* newline = strchr(buffer, '\n');
                 if (newline != NULL) {
@@ -788,39 +849,44 @@ char* getAssetData(char* auction_name) {
 }
 
 
-char* getAssetSize(char* auction_name) {
-    FILE* file = fopen(pathAsset(getAuctionAssetFName(auction_name)), "r");
+char* getAssetData(char* AID) {
+    FILE* file = fopen(pathAsset(getAuctionAssetFName(AID)), "r");
+    
     if (file != NULL) {
-        // Allocate memory for the buffer to store the content of the second line
-        char* buffer = (char*)malloc(256); // Adjust the size as needed
-
-        if (buffer != NULL) {
-            // Skip the first line
-            if (fgets(buffer, 256, file) != NULL) {
-                // Read the second line into the buffer
-                if (fgets(buffer, 256, file) != NULL) {
-                    // Remove the newline character if present
-                    char* newline = strchr(buffer, '\n');
-                    if (newline != NULL) {
-                        *newline = '\0';
-                    }
-
-                    // Close the file
-                    fclose(file);
-
-                    // Return the content of the second line
-                    return buffer;
-                } else {
-                    perror("Error reading file");
-                }
-            } else {
-                perror("Error reading file");
+        // Skip the first line
+        char buffer[256]; // Adjust the size as needed
+        if (fgets(buffer, sizeof(buffer), file) != NULL) {
+            // Calculate the length of the content after skipping the first line
+            size_t contentLength = 0;
+            while (fgets(buffer, sizeof(buffer), file) != NULL) {
+                contentLength += strlen(buffer);
             }
 
-            // Free the allocated buffer if an error occurred
-            free(buffer);
+            // Allocate memory for the entire content after skipping the first line
+            char* content = (char*)malloc(contentLength + 1); // Add 1 for the null terminator
+            
+            if (content != NULL) {
+                // Reset the file pointer to the beginning
+                fseek(file, SEEK_SET, 0);
+
+                // Skip the first line again
+                fgets(buffer, sizeof(buffer), file);
+
+                // Read the remaining content into the allocated buffer
+                while (fgets(buffer, sizeof(buffer), file) != NULL) {
+                    strcat(content, buffer);
+                }
+
+                // Close the file
+                fclose(file);
+
+                // Return the content after skipping the first line
+                return content;
+            } else {
+                perror("Error allocating memory");
+            }
         } else {
-            perror("Error allocating memory");
+            perror("Error reading file");
         }
 
         // Close the file
@@ -833,11 +899,12 @@ char* getAssetSize(char* auction_name) {
     return NULL;
 }
 
-char* getBidsInfo(char* auction_name) {
-    FILE* file = fopen(pathAuctionBids(auction_name), "r");
+char* getBidsInfo(char* AID) {
+    FILE* file = fopen(pathAuctionBids(AID), "r");
     int line_counter = 0;
     if (file != NULL) {
-        char* buffer = (char*)malloc(256*sizeof(char));  // +1 for the null terminator
+
+        char* buffer = (char*)malloc((999*(1 + 1 + UID_LEN + 1 + BID_VALUE_MAX_LEN + 1 + DATE_TIME_FORMAT_LEN + 1 + DURATION_LEN) + 1 + 1 + DATE_TIME_FORMAT_LEN + 1 + DURATION_LEN + 1 + 1)*sizeof(char));  // +1 for the null terminator
 
 
         fseek(file, 0, SEEK_END);

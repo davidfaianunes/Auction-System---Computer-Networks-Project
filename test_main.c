@@ -9,18 +9,14 @@
 #include "utils.h"
 #include "file_management.h"
 #include "serializer_client.h"
+#include "logged_in_linkedlist.h"
 
 int main() {
-    char *data;
-    char *size;
 
-    getDataAndSize("testFileAsset.txt", &data, &size);
 
-    printf("%s\n%s\n", data, size);
+    printf("%s\n",showAsset("000")); 
 
-    // Don't forget to free the allocated memory
-    free(data);
-    free(size);
+
 
     return 0;
 }

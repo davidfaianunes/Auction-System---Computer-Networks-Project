@@ -7,10 +7,42 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include "utils.h"
+#include "datasizes.h"
+#include "file_management.h"
+#include "serializer_client.h"
 
 
+void checkIfClosingAuction(char* AID){
+    if(strcmp(getAuctionStatus(AID),"0")){ //if auction is not yet closed, check if it's time to do so
+        if(atoi(getAuctionTimeactive(AID)) <= (atoi(computeTimeDifference(getCurrentDateTime(), getAuctionStartDateTime(AID))))){
+            closeAuction(AID);
+        }
+    }
+}
 
-void setupWorkspace(){
+void setupWorkspace() {
+    // Create or open the aid_counter.txt file in read mode
+    FILE *file = fopen("aid_counter.txt", "r");
+
+    if (file == NULL) {
+        // File doesn't exist, create it
+        file = fopen("aid_counter.txt", "w");
+        if (file == NULL) {
+            perror("Error opening file");
+            return;
+        }
+
+        // Write "000" to the file
+        fprintf(file, "000");
+
+        // Close the file
+        fclose(file);
+    } else {
+        // File already exists, close it
+        fclose(file);
+    }
+
+    // Continue with the rest of the directory setup...
     if (access("Clients", F_OK) != 0) {
         if (mkdir("Clients", 0755)) {
             perror("Error creating directory");
@@ -29,6 +61,55 @@ void setupWorkspace(){
             return;
         }
     }
+}
+
+
+
+// gets next AID, and stores newest AID for later reference
+char* getNextAID() {
+    // Open the file for reading and writing
+    FILE *file = fopen("aid_counter.txt", "r+");
+    if (file == NULL) {
+        perror("Error opening aid_counter.txt");
+        return NULL;
+    }
+
+    // Read the current AID value from the file
+    char currentAID[AID_MAX_LEN + 1]; // 3 digits + null terminator
+    fgets(currentAID, sizeof(currentAID), file);
+
+    // Check if the current AID is "end"
+    if (strcmp(currentAID, "end") == 0) {
+        // Maximum number of auctions created
+        fclose(file);
+        return NULL;
+    }
+
+    // Convert the current AID to an integer
+    int aidValue = atoi(currentAID);
+
+    // Check if the current value is the maximum
+    if (aidValue == MAX_AID_VALUE) {
+        fseek(file, 0, SEEK_SET);
+        fprintf(file, "end");
+    } else{
+        // Increment the AID value
+        int next_aidValue = aidValue + 1;
+
+        // Write the new AID value back to the file
+        fseek(file, 0, SEEK_SET);
+        fprintf(file, "%03d", next_aidValue);
+    }
+
+
+    // Close the file
+    fclose(file);
+
+    // Allocate memory for the result and convert the new AID value to a string
+    char *result = (char *)malloc(AID_MAX_LEN + 1);
+    sprintf(result, "%03d", aidValue);
+
+    return result;
 }
 
 int checkCredentials(char* UID, char* password){
@@ -60,7 +141,11 @@ int checkCredentials(char* UID, char* password){
     }
 }
 
-int auctionExists(char* auction_name){
+int auctionIsOwnedBy(char*UID, char* AID){
+    return !strcmp(getAuctionHostUID(AID), UID);
+}
+
+int auctionExists(char* AID){
     /*
     0 -> UNR (register ou não faz nada)
     1-> OK (password bem -> login, logout)
@@ -68,7 +153,7 @@ int auctionExists(char* auction_name){
     */
 
 
-    char* path = pathAuctionMain(auction_name);
+    char* path = pathAuctionMain(AID);
     if(access(path, F_OK) != 0){ // auction doesnt exist
         free(path);
         return 0;
@@ -159,7 +244,7 @@ char* listMyAuctions(char* UID) {
 
         if (output != NULL) {
             // Initialize the output string
-            strcpy(output, "OK");
+            strcpy(output, "RMA OK");
 
             do {
                 // Read a line at a time
@@ -174,7 +259,7 @@ char* listMyAuctions(char* UID) {
 
                         if(first_iteration){
                             if(character == EOF){
-                                return "NOK";
+                                return "RMA NOK";
                             }
                             first_iteration = 0;
                         }
@@ -217,11 +302,11 @@ char* listMyAuctions(char* UID) {
 
         } else {
             perror("Error allocating memory");
-            return "NOK";
+            return NULL;
         }
     } else {
         perror("Error opening file");
-        return "NOK";
+        return NULL;
     }
 }
 
@@ -236,7 +321,7 @@ char* listMyBids(char* UID){
 
         if (output != NULL) {
             // Initialize the output string
-            strcpy(output, "OK");
+            strcpy(output, "RMB OK");
 
             do {
                 // Read a line at a time
@@ -251,7 +336,7 @@ char* listMyBids(char* UID){
 
                         if(first_iteration){
                             if(character == EOF){
-                                return "NOK";
+                                return "RMB NOK";
                             }
                             first_iteration = 0;
                         }
@@ -294,11 +379,11 @@ char* listMyBids(char* UID){
 
         } else {
             perror("Error allocating memory");
-            return "NOK";
+            return NULL;
         }
     } else {
         perror("Error opening file");
-        return "NOK";
+        return NULL;
     }
 }
 
@@ -312,13 +397,13 @@ char* listAllAuctions(){
         if (entry == NULL) {
             // Directory is empty
             closedir(dir);
-            return "NOK";
+            return "RLS NOK";
         }
 
 
         char* output = malloc(256*sizeof(char));
         output[0] = '\0';
-        strcat(output, "OK");
+        strcat(output, "RLS OK");
         do {
             // Ignore "." and ".." entries
             if (strcmp(entry->d_name, ".") != 0 && strcmp(entry->d_name, "..") != 0) {
@@ -341,7 +426,7 @@ char* listAllAuctions(){
         return output;
     } else {
         perror("Error opening directory");
-        return "NOK";
+        return NULL;
     }
 }
 
@@ -351,7 +436,7 @@ void createAsset(char* filename, char* data, char* size){
 
     if (file != NULL) {
         // Write the content to the file
-        fprintf(file, "%s\n%s", data, size);
+        fprintf(file, "%s\n%s", size, data);
 
         // File written successfully
     } else {
@@ -365,19 +450,25 @@ void createAsset(char* filename, char* data, char* size){
     free(path); // Free the allocated memory 
 }
 
-void createAuction(char* auction_name, char* host_UID, char* asset_fname, char* asset_data, char* asset_size, char* start_value, char* timeactive){
-    if (access(pathAuctionFolder(auction_name), F_OK) != 0) {
-        if (mkdir(pathAuctionFolder(auction_name), 0755)) {
+char* createAuction(char* auction_name, char* host_UID, char* asset_fname, char* asset_data, char* asset_size, char* start_value, char* timeactive){
+    char* aid = getNextAID();
+    if(aid==NULL){
+        perror("Maximum number of auctions reached.");
+        return NULL;
+    }
+
+    if (access(pathAuctionFolder(aid), F_OK) != 0) {
+        if (mkdir(pathAuctionFolder(aid), 0755)) {
             perror("Error creating directory");
-            return;
+            return NULL;
         }
     }
     
-    FILE* file = fopen(pathAuctionMain(auction_name), "w");
+    FILE* file = fopen(pathAuctionMain(aid), "w");
 
     if (file != NULL) {
         // Write the content to the file
-        fprintf(file, "%s\n%s\n%s\n%s\n%s", host_UID, asset_fname, start_value, getCurrentDateTime(), timeactive);
+        fprintf(file, "%s\n%s\n%s\n%s\n%s\n%s", host_UID, asset_fname, start_value, getCurrentDateTime(), timeactive, auction_name);
 
         // Close the file
         fclose(file);
@@ -385,10 +476,10 @@ void createAuction(char* auction_name, char* host_UID, char* asset_fname, char* 
         // File written successfully
     } else {
         perror("Error opening file");
-        return;
+        return NULL;
     }
 
-    file = fopen(pathAuctionEnd(auction_name), "w");
+    file = fopen(pathAuctionEnd(aid), "w");
 
     if (file != NULL) {
         // Write the content to the file
@@ -400,14 +491,14 @@ void createAuction(char* auction_name, char* host_UID, char* asset_fname, char* 
         // File written successfully
     } else {
         perror("Error opening file");
-        return;
+        return NULL;
     }
 
 
-    file = fopen(pathAuctionBids(auction_name), "w");
+    file = fopen(pathAuctionBids(aid), "w");
     if (file == NULL) {
         perror("Error creating file");
-        return;
+        return NULL;
     }
     else{
         // Close the file
@@ -420,7 +511,7 @@ void createAuction(char* auction_name, char* host_UID, char* asset_fname, char* 
 
     if (file != NULL) {
         // Write the content to the file
-        fprintf(file, "%s\n", auction_name);
+        fprintf(file, "%s\n", aid);
 
         // Close the file
         fclose(file);
@@ -428,19 +519,20 @@ void createAuction(char* auction_name, char* host_UID, char* asset_fname, char* 
         // File written successfully
     } else {
         perror("Error opening file");   
-        return;
+        return NULL;
     }
 
     createAsset(asset_fname, asset_data, asset_size);
+    return aid;
 }
 
-void closeAuction(char* name){
-    FILE* file = fopen(pathAuctionEnd(name), "w");
+void closeAuction(char* AID){
+    FILE* file = fopen(pathAuctionEnd(AID), "w");
     
 
     if (file != NULL) {
         // Write the content to the file
-        fprintf(file, "0\n%s\n%s\n", getCurrentDateTime(), computeTimeDifference(getCurrentDateTime(), getAuctionStartDateTime(name))); //computing seconds auction was opened
+        fprintf(file, "0\n%s\n%s\n", getCurrentDateTime(), computeTimeDifference(getCurrentDateTime(), getAuctionStartDateTime(AID))); //computing seconds auction was opened
 
         // Close the file
         fclose(file);
@@ -452,19 +544,39 @@ void closeAuction(char* name){
     }
 }
 
-char* showAsset(char* AID){
-    char* output = malloc(256*sizeof(char));
+char* showAsset(char* AID){ //FIXME
+    char* output = (char *)malloc(6 + 1 + ASSET_FILENAME_MAX_LEN + 1 + ASSET_SIZE_MAX_LEN + 2);
     output[0] = '\0';
-    strcat(output, "OK ");
+    strcat(output, "RSA OK ");
     strcat(output, getAuctionAssetFName(AID));
     strcat(output, " ");
-    strcat(output, getAssetSize(AID));
+
+
+    // compute how much more memory to allocate to output buffer
+    char* assetsize_str = getAssetSize(AID);
+    int assetsize_int = atoi(assetsize_str);
+
+
+    strcat(output, assetsize_str);
+
+    // allocate more memory to output buffer
+    int newSize = strlen(output) + assetsize_int;
+    output = (char*)realloc(output, newSize + 2);
+
+
     strcat(output, " ");
     strcat(output, getAssetData(AID));
     return output;  
 }
 
 int bid(char* AID, char* value, char* UID){
+    if(auctionIsOwnedBy(UID, AID)){
+        return 3;
+    }
+
+    if(!strcmp(getAuctionStatus(AID),"0")){
+        return 4;
+    }
     if(validateBid(AID, value)){
         // Add info to host User's bids
         FILE* file = fopen(pathClientBidder(UID), "a");
@@ -497,23 +609,23 @@ int bid(char* AID, char* value, char* UID){
             return 0;
         }
     } else{
-        return 0;
+        return 2;
     }
 }
 
 char* showRecord(char* AID){
     if(auctionExists(AID)){
-        char* output = malloc(256*sizeof(char));
+        char* output = malloc((MAX_RESPONSE_SIZE)*sizeof(char));
         output[0] = '\0';
 
         //status
-        strcat(output, "OK ");
+        strcat(output, "RRC OK ");
 
         //main.txt info
 
         strcat(output, getAuctionHostUID(AID));
         strcat(output, " ");
-        strcat(output, AID);
+        strcat(output, getAuctionName(AID));
         strcat(output, " ");
         strcat(output, getAuctionAssetFName(AID));
         strcat(output, " ");
@@ -539,6 +651,6 @@ char* showRecord(char* AID){
         return output;
 
     } else{
-        return "NOK";
+        return "RRC NOK";
     }
 }
